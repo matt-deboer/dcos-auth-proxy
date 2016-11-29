@@ -52,7 +52,7 @@ func (a *authenticator) authenticate() (string, error) {
 	}
 
 	if a.Verbose {
-		log.Infof("Authenticating: POST %s\n%s", a.AuthEndpoint, bodyLog)
+		log.Infof("Authenticating: POST %s  %s", a.AuthEndpoint, bodyLog)
 	}
 
 	r, _ := http.NewRequest("POST", a.AuthEndpoint, bytes.NewBufferString(body))
@@ -61,7 +61,7 @@ func (a *authenticator) authenticate() (string, error) {
 	checkError(err)
 
 	if a.Verbose {
-		log.Infof("Authentication result: %d\n", resp.StatusCode)
+		log.Infof("Authentication result: %d", resp.StatusCode)
 	}
 
 	rbody := []byte{}
