@@ -1,7 +1,13 @@
 language: go
 go:
-  - 1.7
-
+- 1.7
 script:
-  - make release
-
+- make release
+deploy:
+  provider: releases
+  api_key:
+    secure: rICOArEF+Oq00q8a8Hdw24iLICwML3HuqkTRlZz1szTUapbpLuDhKnSr0RjT+huArXazX/fIhaFoo6PqkCTJ+H3rP4tRHuBa5+p8x/K6eNgwrcN4M8BZL9u9zZz/7YiSTIREbBJf1783Jz+Wzf3wHSmDWLpv6IXp+Hh3zc4eejhefoACv/1FgIT4p4A4MUwVJhyFVKrPQXyRQihs7Ot23SxCHd7rH8dvfG/hMOx/yqh8q9oRcW6gd8r3fHCxMAvV5emKnQ3DxpXMo+B2DI0kS4o7/u0hhf5zfDMMeQ92dbhG2lScHhRTmR02JQ5beUOsj4O4bdVq8eaCMRJ3/RQhYo2fqj5ULzVGBP3gDFtq4AkhnCgp0gRCVE4Db04tOfgxkPkKXAzouEzenepjQhZ2p2UNSSI7hsUofSrVE/la1/nQo+Zpsnre+BZMn6sOg+KIJGbpzv7Ak2HapOrW1Wg4jrQtNbn2irIx3J65Dj/eTsBU2YIk0Jg0eQpHZur4+VkVlReNWGpSElJ9FP6sqTfZc+GRbHQedNa4GLa9Tv4thgJL3SoLl74cJ4wiI2akf3nRg7T5xa2CIOfc+SymydGy6LXSJm/WFogd/Qtx3R0HVxLwiBcn3Bt8M50ZWK6v0AZZjr+CZsuWroncl2qFzzhplDoxuAcyisyVsrGMxkVij3g=
+  file: bin/dcos-auth-proxy
+  on:
+    repo: matt-deboer/dcos-auth-proxy
+    tags: yes
