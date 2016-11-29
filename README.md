@@ -1,6 +1,8 @@
 dcos-auth-proxy
 ===
 
+[![Build Status](https://travis-ci.org/matt-deboer/dcos-auth-proxy.svg?branch=master)](https://travis-ci.org/matt-deboer/dcos-auth-proxy)
+
 A simple authenticating proxy for DCOS that allows you to expose Marathon, Metronome, and other
 DCOS protected APIs on a local port such that authentication is automatically handled by the proxy.
 
