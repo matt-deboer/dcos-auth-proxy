@@ -40,10 +40,19 @@ type authenticator struct {
 
 func (a *authenticator) authenticate() (string, error) {
 
-	token, _ := a.getSelfSignedToken()
-	body := fmt.Sprintf(`{"uid":"%s","token":"%s"}`, a.creds.UID, token)
+	var body string
+	var bodyLog string
+	if a.creds.PrivateKey != nil {
+		token, _ := a.getSelfSignedToken()
+		body = fmt.Sprintf(`{"uid":"%s","token":"%s"}`, a.creds.UID, token)
+		bodyLog = body
+	} else {
+		body = fmt.Sprintf(`{"uid":"%s","password":"%s"}`, a.creds.UID, a.creds.Password)
+		bodyLog = fmt.Sprintf(`{"uid":"%s","password":"%s"}`, a.creds.UID, "****")
+	}
+
 	if a.Verbose {
-		log.Infof("Authenticating: POST %s\n%s", a.AuthEndpoint, body)
+		log.Infof("Authenticating: POST %s\n%s", a.AuthEndpoint, bodyLog)
 	}
 
 	r, _ := http.NewRequest("POST", a.AuthEndpoint, bytes.NewBufferString(body))

@@ -112,9 +112,14 @@ func main() {
 			authEndpoint = targetURL.Scheme + "://" + targetURL.Host + "/acs/api/v1/auth/login"
 		}
 
-		creds, err := parseCredentials([]byte(secret))
-		if verbose {
-			log.Infof("Parsed credentials from secret: %#v", creds)
+		var creds *credentials
+		if len(secret) > 0 {
+			creds, err = parseCredentials([]byte(secret))
+			if verbose {
+				log.Infof("Parsed credentials from secret: %#v", creds)
+			}
+		} else if len(password) > 0 {
+			creds = &credentials{UID: username, Password: password}
 		}
 
 		address := fmt.Sprintf("%s:%d", host, port)
