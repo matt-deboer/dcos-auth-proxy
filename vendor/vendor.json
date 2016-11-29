@@ -1,0 +1,13 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "KmP2QaSBtcjRWNDaDsi1FvkR8aA=",
+			"path": "github.com/elazarl/goproxy",
+			"revision": "6016d2397298b0750eeb06f4d24e03cfd7e45c77",
+			"revisionTime": "2016-09-24T20:51:19Z"
+		}
+	],
+	"rootPath": "github.com/matt-deboer/dcos-auth-proxy"
+}
