@@ -14,7 +14,7 @@ type credentials struct {
 	Password   string
 }
 
-func parseCredentials(secret []byte) (*credentials, error) {
+func fromPrincipalSecret(secret []byte) (*credentials, error) {
 	data := make(map[string]interface{})
 	if err := json.Unmarshal(secret, &data); err != nil {
 		return nil, err
@@ -27,6 +27,14 @@ func parseCredentials(secret []byte) (*credentials, error) {
 		return &credentials{UID: uid, Password: password.(string)}, nil
 	}
 	return nil, nil
+}
+
+func fromPrivateKey(username string, pkBytes []byte) (*credentials, error) {
+	pk, err := parsePrivateKey(pkBytes)
+	if err != nil {
+		return nil, err
+	}
+	return &credentials{UID: username, PrivateKey: pk}, nil
 }
 
 func parsePrivateKey(key []byte) (*rsa.PrivateKey, error) {

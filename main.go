@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os"
 
+	"io/ioutil"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
 )
@@ -57,8 +59,16 @@ func main() {
 			Usage: "proxy authentication password file",
 		},
 		cli.StringFlag{
+			Name:  "private-key-file, pk",
+			Usage: "file containing private-key used to authenticate (requires 'username')",
+		},
+		cli.StringFlag{
 			Name:  "principal-secret, s",
 			Usage: "principal secret containing credentials for obtaining auth tokens",
+		},
+		cli.StringFlag{
+			Name:  "principal-secret-file, sf",
+			Usage: "principal secret file containing credentials for obtaining auth tokens",
 		},
 		cli.BoolFlag{
 			Name:  "verbose, V",
@@ -77,19 +87,21 @@ func main() {
 		authEndpoint := c.String("auth-endpoint")
 		username := c.String("username")
 		password := c.String("password")
-		pwfile := c.String("password-file")
+		passwordFile := c.String("password-file")
+		privateKeyFile := c.String("private-key-file")
 		verbose := c.Bool("verbose")
 		secret := c.String("principal-secret")
+		secretFile := c.String("principal-secret-file")
 		insecure := c.Bool("insecure")
 
-		if len(secret) == 0 {
+		if len(secret) == 0 && len(secretFile) == 0 {
 			if len(username) == 0 {
-				println("ERROR: 'username' is required when 'principal-secret' not specified\n")
+				println("ERROR: 'username' is required when 'principal-secret(-file)' not specified\n")
 				cli.ShowAppHelp(c)
 				os.Exit(1)
 			}
-			if len(password) == 0 && len(pwfile) == 0 {
-				println("ERROR: one of 'password' or 'password-file' is required when 'principal-secret' not specified\n")
+			if len(password) == 0 && len(passwordFile) == 0 && len(privateKeyFile) == 0 {
+				println("ERROR: one of 'password' or 'password-file' or 'privateKeyFile' is required when 'principal-secret(-file)' not specified\n")
 				cli.ShowAppHelp(c)
 				os.Exit(1)
 			}
@@ -114,12 +126,42 @@ func main() {
 
 		var creds *credentials
 		if len(secret) > 0 {
-			creds, err = parseCredentials([]byte(secret))
-			if verbose {
-				log.Infof("Parsed credentials from secret: %#v", creds)
+
+			creds, err = fromPrincipalSecret([]byte(secret))
+
+		} else if len(secretFile) > 0 {
+
+			bytes, err := ioutil.ReadFile(secretFile)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'secretFile' %s could not be read: %v\n", secretFile, err))
+				os.Exit(1)
 			}
+
+			creds, err = fromPrincipalSecret(bytes)
+
+		} else if len(privateKeyFile) > 0 {
+
+			bytes, err := ioutil.ReadFile(privateKeyFile)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'privateKeyFile' %s could not be read: %v\n", privateKeyFile, err))
+				os.Exit(1)
+			}
+
+			creds, err = fromPrivateKey(username, bytes)
+
 		} else if len(password) > 0 {
+
 			creds = &credentials{UID: username, Password: password}
+
+		} else if len(passwordFile) > 0 {
+
+			bytes, err := ioutil.ReadFile(passwordFile)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'passwordFile' %s could not be read: %v\n", passwordFile, err))
+				os.Exit(1)
+			}
+
+			creds = &credentials{UID: username, Password: string(bytes)}
 		}
 
 		address := fmt.Sprintf("%s:%d", host, port)
