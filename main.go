@@ -2,11 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
-
-	"io/ioutil"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
@@ -18,7 +17,8 @@ var Name string
 // Version is set at compile time with the git version
 var Version string
 
-func main() {
+func run(args []string) {
+
 	app := cli.NewApp()
 	app.Name = Name
 	app.Usage = `DCOS OAuth authenticating proxy
@@ -94,7 +94,7 @@ func main() {
 		secretFile := c.String("principal-secret-file")
 		insecure := c.Bool("insecure")
 
-		if len(secret) == 0 && len(secretFile) == 0 {
+		if !c.GlobalIsSet("principal-secret") && !c.GlobalIsSet("principal-secret-file") {
 			if len(username) == 0 {
 				println("ERROR: 'username' is required when 'principal-secret(-file)' not specified\n")
 				cli.ShowAppHelp(c)
@@ -128,6 +128,10 @@ func main() {
 		if len(secret) > 0 {
 
 			creds, err = fromPrincipalSecret([]byte(secret))
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'secret' %s could not be parsed: %v\n", secret, err))
+				os.Exit(1)
+			}
 
 		} else if len(secretFile) > 0 {
 
@@ -165,12 +169,18 @@ func main() {
 		}
 
 		address := fmt.Sprintf("%s:%d", host, port)
-		if verbose {
-			log.Infof("Proxying %s on %s", target, address)
-		}
 		handler := NewAuthenticator(targetURL, authEndpoint, creds, verbose, insecure)
 
+		if err != nil {
+			log.Fatal(err)
+		} else if verbose {
+			log.Infof("Proxying %s on %s", target, address)
+		}
 		log.Fatal(http.ListenAndServe(address, handler))
 	}
-	app.Run(os.Args)
+	app.Run(args)
+}
+
+func main() {
+	run(os.Args)
 }
