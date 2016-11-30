@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto"
 	"crypto/rand"
@@ -114,8 +115,6 @@ func NewAuthenticator(target *url.URL, authEndpoint string, creds *credentials, 
 	a := &authenticator{Target: target, AuthEndpoint: authEndpoint, creds: creds, Verbose: verbose, hash: crypto.SHA256}
 
 	proxy := goproxy.NewProxyHttpServer()
-	// proxy.Verbose = a.Verbose
-	reqConds := proxy.OnRequest()
 	if insecure {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -125,7 +124,7 @@ func NewAuthenticator(target *url.URL, authEndpoint string, creds *credentials, 
 		a.client = &http.Client{}
 	}
 
-	reqConds.HandleConnect(goproxy.AlwaysMitm)
+	proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)
 	proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if a.Verbose {
 			log.Debug(fmt.Sprintf("Handling Non-Proxy request for: %s", req.URL.String()))
@@ -139,7 +138,7 @@ func NewAuthenticator(target *url.URL, authEndpoint string, creds *credentials, 
 		proxy.ServeHTTP(w, req)
 	})
 
-	reqConds.DoFunc(
+	proxy.OnRequest().DoFunc(
 		func(req *http.Request, ctx *goproxy.ProxyCtx) (*http.Request, *http.Response) {
 			originalURL := req.URL.String()
 			req.URL.Host = target.Host
@@ -151,6 +150,14 @@ func NewAuthenticator(target *url.URL, authEndpoint string, creds *credentials, 
 				log.Infof("Proxying %s --> %s", originalURL, req.URL.String())
 			}
 			req.Header.Set("Authorization", a.authZ)
+			reqBody, err := ioutil.ReadAll(req.Body)
+			if err != nil {
+				log.Errorf("Error reading request body: %v", err)
+				resp, _ := http.ReadResponse(bufio.NewReader(bytes.NewBufferString("Error reading request body")), req)
+				return req, resp
+			}
+			req.Body = ioutil.NopCloser(bytes.NewBuffer(reqBody))
+			ctx.UserData = reqBody
 			return req, nil
 		})
 
@@ -173,6 +180,7 @@ func NewAuthenticator(target *url.URL, authEndpoint string, creds *credentials, 
 					} else {
 						a.authZ = authZ
 						ctx.Req.Header.Set("Authorization", a.authZ)
+						ctx.Req.Body = ioutil.NopCloser(bytes.NewBuffer(ctx.UserData.([]byte)))
 						response, _ = a.client.Do(ctx.Req)
 					}
 				} else {

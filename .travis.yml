@@ -1,8 +1,11 @@
 language: go
 go:
 - 1.7
+before_install:
+  - go get github.com/mattn/goveralls
 script:
 - make release
+- $HOME/gopath/bin/goveralls -service=travis-ci
 deploy:
   provider: releases
   api_key:
@@ -10,4 +13,7 @@ deploy:
   file: bin/dcos-auth-proxy
   on:
     repo: matt-deboer/dcos-auth-proxy
-    tags: yes
+    tags: true
+env:
+  global:
+    secure: HQ+3y4JZb3KgUSzrlUV1MEq8k1gRODw08fsL88JM+LssTfQSbq2Kt5/OPpAu6ghHO4AW+HQAtM2P9GwWq4+BPGkdui2dNnw0XWp8Lz02yWB0hGAV+9H7vVxtoYx9w3lKhLYidk1c7UvtvyTwdG9oZoO6v2Rqin7hZ6YTJASSHPsP4Y0fXt98ktdUwqkJj33Rn1W1YyAwJS5s8byC5Bgn5hSLhuUJ+R569pIgp7kflPuMMw00w/aFh4A4zrgiIHT5km+DmpyAbqvDdg4T8zlBrljDYZLYq1Xrx5HstRoa3SoSwtJWMhjfYfjWlYCO+jVqvosxpx/6EQ9blTahQaV4aFrkgQucox1Sogmgx0mOtFfAWbdzvMotirqIKOkD0T3zyosQTxXoq6xClzPut/mrFFl99AK9EqzPg7kytRr3b7zmGhuGFfycc18aAoqssQGTFnTuRfa3PjxYXle1iTGoRz/KGOcMfFuXNfvBt48pOWYyaUfRaOhBr2jDKtnroMv/96HupQ9Hyq9KVAIT5mObOT9AR/YOFPY62Vfzj5T/nwhZoVNyASSe/zhWt6NK/g8aqPgiR4NWdZBK8yvr+5ME22d064iqfurQm6lzKsg/jJJDjQWKX6hmdCikXpz2T6GYpYsXzCCuV6RCD1BQsA2UAkMcLuYVGkhUwblc9m1U5kc=

@@ -1,14 +1,14 @@
 VERSION  := $$(git describe --tags --always)
 TARGET   := $$(basename `git rev-parse --show-toplevel`)
-TEST     ?= ./...
+TEST     ?= $$(go list ./... | grep -v /vendor/)
 
 default: test build
 
 test:
-	go test -v -run=$(RUN) $(TEST)
+	go test -v -cover -run=$(RUN) $(TEST)
 
 build: clean
-	go build -v -o bin/$(TARGET)
+	@go build -v -o bin/$(TARGET)
 
 release: clean
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build \
@@ -17,4 +17,4 @@ release: clean
 		-o bin/$(TARGET) .
 
 clean:
-	rm -rf bin/
+	@rm -rf bin/
