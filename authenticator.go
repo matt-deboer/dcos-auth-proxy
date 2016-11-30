@@ -78,7 +78,7 @@ func (a *authenticator) authenticate() (string, error) {
 		if err := json.Unmarshal(rbody, &data); err != nil {
 			return "", err
 		}
-		return "token=" + data["token"].(string), nil
+		return data["token"].(string), nil
 	}
 
 	log.Error(fmt.Sprintf("POST %s : %d\n%s",
@@ -107,23 +107,27 @@ func base64URLEncode(bytes []byte) string {
 	return strings.TrimRight(base64.URLEncoding.EncodeToString(bytes), "=")
 }
 
-// NewAuthenticator creates a new *goproxy.ProxyHttpServer with an automatic
-// authentication handler using the credentials provided. URLs are re-written
-// to point at the provided 'target'.
-func NewAuthenticator(target *url.URL, authEndpoint string, creds *credentials, verbose bool, insecure bool) *goproxy.ProxyHttpServer {
-
-	a := &authenticator{Target: target, AuthEndpoint: authEndpoint, creds: creds, Verbose: verbose, hash: crypto.SHA256}
-
-	proxy := goproxy.NewProxyHttpServer()
+func newAuthenticator(target *url.URL, authEndpoint string, creds *credentials, verbose bool, insecure bool) *authenticator {
+	var client *http.Client
 	if insecure {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		a.client = &http.Client{Transport: tr}
+		client = &http.Client{Transport: tr}
 	} else {
-		a.client = &http.Client{}
+		client = &http.Client{}
 	}
+	return &authenticator{Target: target, AuthEndpoint: authEndpoint, creds: creds, Verbose: verbose, hash: crypto.SHA256, client: client}
+}
 
+// NewAuthenticationHandler creates a new *goproxy.ProxyHttpServer with an automatic
+// authentication handler using the credentials provided. URLs are re-written
+// to point at the provided 'target'.
+func NewAuthenticationHandler(target *url.URL, authEndpoint string, creds *credentials, verbose bool, insecure bool) *goproxy.ProxyHttpServer {
+
+	a := newAuthenticator(target, authEndpoint, creds, verbose, insecure)
+
+	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)
 	proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if a.Verbose {
@@ -178,7 +182,7 @@ func NewAuthenticator(target *url.URL, authEndpoint string, creds *credentials, 
 						log.Errorf("Authentication failure: %v", err)
 						response = r
 					} else {
-						a.authZ = authZ
+						a.authZ = "token=" + authZ
 						ctx.Req.Header.Set("Authorization", a.authZ)
 						ctx.Req.Body = ioutil.NopCloser(bytes.NewBuffer(ctx.UserData.([]byte)))
 						response, _ = a.client.Do(ctx.Req)

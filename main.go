@@ -8,7 +8,7 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
 // Name is set at compile time based on the git repository
@@ -17,7 +17,7 @@ var Name string
 // Version is set at compile time with the git version
 var Version string
 
-func run(args []string) {
+func run(args []string, stdout *os.File, stderr *os.File) {
 
 	app := cli.NewApp()
 	app.Name = Name
@@ -27,15 +27,15 @@ func run(args []string) {
 		by obtaining and injecting auth tokens as needed.
 		`
 	app.Version = Version
-	app.Flags = []cli.Flag{
+	commonFlags := []cli.Flag{
+		cli.StringFlag{
+			Name:  "target, t",
+			Usage: "The target URL to be proxied",
+		},
 		cli.IntFlag{
 			Name:  "port, p",
 			Value: 8888,
 			Usage: "the port on which to listen",
-		},
-		cli.StringFlag{
-			Name:  "target, t",
-			Usage: "The target URL to be proxied",
 		},
 		cli.StringFlag{
 			Name:  "auth-endpoint, a",
@@ -79,106 +79,140 @@ func run(args []string) {
 			Usage: "allow connections to SSL sites without valid certs",
 		},
 	}
+	app.Flags = commonFlags
 
+	app.Commands = []cli.Command{
+		cli.Command{
+			Name:  "authenticate",
+			Usage: "authenticates to the auth endpoint and writes the resulting token to stdout",
+			Flags: commonFlags,
+			Action: func(c *cli.Context) {
+				log.SetOutput(stderr)
+				verbose := c.Bool("verbose")
+
+				creds, authEndpoint, _ := parseFlags(c)
+				token, err := newAuthenticator(nil, authEndpoint, creds, verbose, c.Bool("insecure")).authenticate()
+				if err != nil {
+					log.Fatalf("Authentication error: %v", err)
+				}
+				stdout.WriteString(token)
+			},
+		},
+	}
 	app.Action = func(c *cli.Context) {
+
 		port := c.Int("port")
 		host := c.String("host")
-		target := c.String("target")
-		authEndpoint := c.String("auth-endpoint")
-		username := c.String("username")
-		password := c.String("password")
-		passwordFile := c.String("password-file")
-		privateKeyFile := c.String("private-key-file")
 		verbose := c.Bool("verbose")
-		secret := c.String("principal-secret")
-		secretFile := c.String("principal-secret-file")
 		insecure := c.Bool("insecure")
 
-		if !c.GlobalIsSet("principal-secret") && !c.GlobalIsSet("principal-secret-file") {
-			if len(username) == 0 {
-				println("ERROR: 'username' is required when 'principal-secret(-file)' not specified\n")
-				cli.ShowAppHelp(c)
-				os.Exit(1)
-			}
-			if len(password) == 0 && len(passwordFile) == 0 && len(privateKeyFile) == 0 {
-				println("ERROR: one of 'password' or 'password-file' or 'privateKeyFile' is required when 'principal-secret(-file)' not specified\n")
-				cli.ShowAppHelp(c)
-				os.Exit(1)
-			}
-		}
-
-		if len(target) == 0 {
+		if len(c.String("target")) == 0 {
 			println("ERROR: 'target' is required\n")
 			cli.ShowAppHelp(c)
 			os.Exit(1)
 		}
 
-		targetURL, err := url.Parse(target)
-		if err != nil {
-			println(fmt.Sprintf("ERROR: 'target' %s is invalid: %v\n", target, err))
-			cli.ShowAppHelp(c)
-			os.Exit(1)
-		}
-
-		if len(authEndpoint) == 0 {
-			authEndpoint = targetURL.Scheme + "://" + targetURL.Host + "/acs/api/v1/auth/login"
-		}
-
-		var creds *credentials
-		if len(secret) > 0 {
-
-			creds, err = fromPrincipalSecret([]byte(secret))
-			if err != nil {
-				println(fmt.Sprintf("ERROR: 'secret' %s could not be parsed: %v\n", secret, err))
-				os.Exit(1)
-			}
-
-		} else if len(secretFile) > 0 {
-
-			bytes, err := ioutil.ReadFile(secretFile)
-			if err != nil {
-				println(fmt.Sprintf("ERROR: 'secretFile' %s could not be read: %v\n", secretFile, err))
-				os.Exit(1)
-			}
-
-			creds, err = fromPrincipalSecret(bytes)
-
-		} else if len(privateKeyFile) > 0 {
-
-			bytes, err := ioutil.ReadFile(privateKeyFile)
-			if err != nil {
-				println(fmt.Sprintf("ERROR: 'privateKeyFile' %s could not be read: %v\n", privateKeyFile, err))
-				os.Exit(1)
-			}
-
-			creds, err = fromPrivateKey(username, bytes)
-
-		} else if len(password) > 0 {
-
-			creds = &credentials{UID: username, Password: password}
-
-		} else if len(passwordFile) > 0 {
-
-			bytes, err := ioutil.ReadFile(passwordFile)
-			if err != nil {
-				println(fmt.Sprintf("ERROR: 'passwordFile' %s could not be read: %v\n", passwordFile, err))
-				os.Exit(1)
-			}
-
-			creds = &credentials{UID: username, Password: string(bytes)}
-		}
+		creds, authEndpoint, targetURL := parseFlags(c)
 
 		address := fmt.Sprintf("%s:%d", host, port)
-		handler := NewAuthenticator(targetURL, authEndpoint, creds, verbose, insecure)
+		handler := NewAuthenticationHandler(targetURL, authEndpoint, creds, verbose, insecure)
 
 		if verbose {
-			log.Infof("Proxying %s on %s", target, address)
+			log.Infof("Proxying %s on %s", targetURL.String(), address)
 		}
 		log.Fatal(http.ListenAndServe(address, handler))
 	}
 	app.Run(args)
 }
 
+func parseFlags(c *cli.Context) (creds *credentials, authURL string, targetURL *url.URL) {
+	target := c.String("target")
+	authEndpoint := c.String("auth-endpoint")
+	username := c.String("username")
+	password := c.String("password")
+	passwordFile := c.String("password-file")
+	privateKeyFile := c.String("private-key-file")
+	secret := c.String("principal-secret")
+	secretFile := c.String("principal-secret-file")
+
+	if len(secret) == 0 && len(secretFile) == 0 {
+		if len(username) == 0 {
+			println("ERROR: 'username' is required when 'principal-secret(-file)' not specified\n")
+			cli.ShowAppHelp(c)
+			os.Exit(1)
+		}
+		if len(password) == 0 && len(passwordFile) == 0 && len(privateKeyFile) == 0 {
+			println("ERROR: one of 'password' or 'password-file' or 'privateKeyFile' is required when 'principal-secret(-file)' not specified\n")
+			cli.ShowAppHelp(c)
+			os.Exit(1)
+		}
+	}
+
+	if len(target) > 0 {
+		t, err := url.Parse(target)
+		if err != nil {
+			println(fmt.Sprintf("ERROR: 'target' %s is invalid: %v\n", target, err))
+			cli.ShowAppHelp(c)
+			os.Exit(1)
+		}
+		targetURL = t
+	}
+
+	if len(authEndpoint) == 0 {
+		if targetURL == nil {
+			println("ERROR: 'auth-endpoint' (or 'target') is required")
+			cli.ShowAppHelp(c)
+			os.Exit(1)
+		}
+		authEndpoint = targetURL.Scheme + "://" + targetURL.Host + "/acs/api/v1/auth/login"
+	}
+
+	var err error
+	if len(secret) > 0 {
+
+		creds, err = fromPrincipalSecret([]byte(secret))
+		if err != nil {
+			println(fmt.Sprintf("ERROR: 'secret' %s could not be parsed: %v\n", secret, err))
+			os.Exit(1)
+		}
+
+	} else if len(secretFile) > 0 {
+
+		bytes, err := ioutil.ReadFile(secretFile)
+		if err != nil {
+			println(fmt.Sprintf("ERROR: 'secretFile' %s could not be read: %v\n", secretFile, err))
+			os.Exit(1)
+		}
+
+		creds, err = fromPrincipalSecret(bytes)
+
+	} else if len(privateKeyFile) > 0 {
+
+		bytes, err := ioutil.ReadFile(privateKeyFile)
+		if err != nil {
+			println(fmt.Sprintf("ERROR: 'privateKeyFile' %s could not be read: %v\n", privateKeyFile, err))
+			os.Exit(1)
+		}
+
+		creds, err = fromPrivateKey(username, bytes)
+
+	} else if len(password) > 0 {
+
+		creds = &credentials{UID: username, Password: password}
+
+	} else if len(passwordFile) > 0 {
+
+		bytes, err := ioutil.ReadFile(passwordFile)
+		if err != nil {
+			println(fmt.Sprintf("ERROR: 'passwordFile' %s could not be read: %v\n", passwordFile, err))
+			os.Exit(1)
+		}
+
+		creds = &credentials{UID: username, Password: string(bytes)}
+	}
+	return creds, authEndpoint, targetURL
+}
+
 func main() {
-	run(os.Args)
+	run(os.Args, os.Stdin, os.Stdout)
 }

@@ -10,12 +10,15 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"encoding/json"
 	"io/ioutil"
 )
 
 func genPrivateKey(t *testing.T) *rsa.PrivateKey {
-	pk, _ := rsa.GenerateKey(rand.Reader, 2048)
+	pk, err := rsa.GenerateKey(rand.Reader, 2048)
+	assert.NoError(t, err)
 	return pk
 }
 
