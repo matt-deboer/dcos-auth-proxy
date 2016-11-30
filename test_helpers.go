@@ -14,15 +14,8 @@ import (
 	"io/ioutil"
 )
 
-func testError(t *testing.T, err error) {
-	if err != nil {
-		t.Error(err)
-	}
-}
-
 func genPrivateKey(t *testing.T) *rsa.PrivateKey {
-	pk, err := rsa.GenerateKey(rand.Reader, 2048)
-	testError(t, err)
+	pk, _ := rsa.GenerateKey(rand.Reader, 2048)
 	return pk
 }
 
@@ -47,15 +40,9 @@ type mockAuthEndpoint struct {
 }
 
 func (m *mockAuthEndpoint) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	bytes, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		panic(err)
-	}
+	bytes, _ := ioutil.ReadAll(req.Body)
 	data := make(map[string]interface{})
-	err = json.Unmarshal(bytes, &data)
-	if err != nil {
-		panic(err)
-	}
+	json.Unmarshal(bytes, &data)
 	// TODO: verify the token
 	w.WriteHeader(200)
 	w.Header().Set("Content-Type", "application/json")

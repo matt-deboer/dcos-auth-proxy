@@ -171,9 +171,7 @@ func run(args []string) {
 		address := fmt.Sprintf("%s:%d", host, port)
 		handler := NewAuthenticator(targetURL, authEndpoint, creds, verbose, insecure)
 
-		if err != nil {
-			log.Fatal(err)
-		} else if verbose {
+		if verbose {
 			log.Infof("Proxying %s on %s", target, address)
 		}
 		log.Fatal(http.ListenAndServe(address, handler))
