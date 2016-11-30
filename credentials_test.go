@@ -25,8 +25,7 @@ func TestParsePrincipalSecretFile(t *testing.T) {
 	_json := make(map[string]interface{})
 	_json["uid"] = "random"
 	_json["private_key"] = string(pkBytes)
-	jsonBytes, err := json.Marshal(_json)
-	testError(t, err)
+	jsonBytes, _ := json.Marshal(_json)
 
 	creds, err := fromPrincipalSecret(jsonBytes)
 	assert.NoError(t, err)
