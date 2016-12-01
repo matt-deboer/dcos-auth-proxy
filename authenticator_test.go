@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	mrand "math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,14 +14,8 @@ import (
 
 func TestAuthenticateRetryWithBody(t *testing.T) {
 
+	token := genToken()
 	pk := genPrivateKey(t)
-	creds, _ := fromPrivateKey("random", toPEM(pk))
-	b := make([]rune, 64)
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	for i := range b {
-		b[i] = letters[mrand.Intn(len(letters))]
-	}
-	token := string(b)
 
 	authServer := httptest.NewTLSServer(&mockAuthEndpoint{pk: pk, token: token})
 	defer authServer.Close()
@@ -31,7 +24,8 @@ func TestAuthenticateRetryWithBody(t *testing.T) {
 	defer targetServer.Close()
 	targetEndpoint, _ := url.Parse(targetServer.URL)
 
-	proxyServer := httptest.NewServer(NewAuthenticationHandler(targetEndpoint, authServer.URL, creds, true, true))
+	creds, _ := fromPrivateKey("random", toPEM(pk), authServer.URL)
+	proxyServer := httptest.NewServer(NewAuthenticationHandler(targetEndpoint, creds, true, true))
 	defer proxyServer.Close()
 
 	req, _ := http.NewRequest("POST", proxyServer.URL, bytes.NewBufferString(`{"cloud":"butt"}`))
@@ -44,13 +38,7 @@ func TestAuthenticateRetryWithBody(t *testing.T) {
 func TestAuthenticate(t *testing.T) {
 
 	pk := genPrivateKey(t)
-	creds, _ := fromPrivateKey("random", toPEM(pk))
-	b := make([]rune, 64)
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	for i := range b {
-		b[i] = letters[mrand.Intn(len(letters))]
-	}
-	token := string(b)
+	token := genToken()
 
 	authServer := httptest.NewTLSServer(&mockAuthEndpoint{pk: pk, token: token})
 	defer authServer.Close()
@@ -59,7 +47,8 @@ func TestAuthenticate(t *testing.T) {
 	defer targetServer.Close()
 	targetEndpoint, _ := url.Parse(targetServer.URL)
 
-	a := newAuthenticator(targetEndpoint, authServer.URL, creds, true, true)
+	creds, _ := fromPrivateKey("random", toPEM(pk), authServer.URL)
+	a := newAuthenticator(targetEndpoint, creds, true, true)
 
 	token, err := a.authenticate()
 	assert.NoError(t, err)

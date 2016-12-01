@@ -11,7 +11,7 @@ func TestParsePrivateKeyFile(t *testing.T) {
 
 	pkBytes := toPEM(genPrivateKey(t))
 
-	creds, err := fromPrivateKey("random", pkBytes)
+	creds, err := fromPrivateKey("random", pkBytes, "")
 	assert.NoError(t, err)
 	assert.NotNil(t, creds, "Creds should be parsed")
 	assert.Equal(t, "random", creds.UID, "UID not equal")
@@ -23,6 +23,7 @@ func TestParsePrincipalSecretFile(t *testing.T) {
 	pkBytes := toPEM(genPrivateKey(t))
 
 	_json := make(map[string]interface{})
+	_json["login_endpoint"] = "http://login-here.com"
 	_json["uid"] = "random"
 	_json["private_key"] = string(pkBytes)
 	jsonBytes, _ := json.Marshal(_json)
@@ -31,5 +32,6 @@ func TestParsePrincipalSecretFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, creds, "Creds should be parsed")
 	assert.Equal(t, "random", creds.UID, "UID not equal")
+	assert.Equal(t, "http://login-here.com", creds.AuthEndpoint)
 	assert.NotNil(t, creds.PrivateKey, "Private key should be parsed")
 }

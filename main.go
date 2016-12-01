@@ -89,9 +89,8 @@ func run(args []string, stdout *os.File, stderr *os.File) {
 			Action: func(c *cli.Context) {
 				log.SetOutput(stderr)
 				verbose := c.Bool("verbose")
-
-				creds, authEndpoint, _ := parseFlags(c)
-				token, err := newAuthenticator(nil, authEndpoint, creds, verbose, c.Bool("insecure")).authenticate()
+				creds, _ := parseFlags(c)
+				token, err := newAuthenticator(nil, creds, verbose, c.Bool("insecure")).authenticate()
 				if err != nil {
 					log.Fatalf("Authentication error: %v", err)
 				}
@@ -112,10 +111,10 @@ func run(args []string, stdout *os.File, stderr *os.File) {
 			os.Exit(1)
 		}
 
-		creds, authEndpoint, targetURL := parseFlags(c)
+		creds, targetURL := parseFlags(c)
 
 		address := fmt.Sprintf("%s:%d", host, port)
-		handler := NewAuthenticationHandler(targetURL, authEndpoint, creds, verbose, insecure)
+		handler := NewAuthenticationHandler(targetURL, creds, verbose, insecure)
 
 		if verbose {
 			log.Infof("Proxying %s on %s", targetURL.String(), address)
@@ -125,7 +124,8 @@ func run(args []string, stdout *os.File, stderr *os.File) {
 	app.Run(args)
 }
 
-func parseFlags(c *cli.Context) (creds *credentials, authURL string, targetURL *url.URL) {
+func parseFlags(c *cli.Context) (creds *authContext, targetURL *url.URL) {
+
 	target := c.String("target")
 	authEndpoint := c.String("auth-endpoint")
 	username := c.String("username")
@@ -158,7 +158,7 @@ func parseFlags(c *cli.Context) (creds *credentials, authURL string, targetURL *
 		targetURL = t
 	}
 
-	if len(authEndpoint) == 0 {
+	if len(authEndpoint) == 0 && len(secret) == 0 && len(secretFile) == 0 {
 		if targetURL == nil {
 			println("ERROR: 'auth-endpoint' (or 'target') is required")
 			cli.ShowAppHelp(c)
@@ -194,11 +194,11 @@ func parseFlags(c *cli.Context) (creds *credentials, authURL string, targetURL *
 			os.Exit(1)
 		}
 
-		creds, err = fromPrivateKey(username, bytes)
+		creds, err = fromPrivateKey(username, bytes, authEndpoint)
 
 	} else if len(password) > 0 {
 
-		creds = &credentials{UID: username, Password: password}
+		creds = &authContext{UID: username, Password: password, AuthEndpoint: authEndpoint}
 
 	} else if len(passwordFile) > 0 {
 
@@ -208,9 +208,9 @@ func parseFlags(c *cli.Context) (creds *credentials, authURL string, targetURL *
 			os.Exit(1)
 		}
 
-		creds = &credentials{UID: username, Password: string(bytes)}
+		creds = &authContext{UID: username, Password: string(bytes), AuthEndpoint: authEndpoint}
 	}
-	return creds, authEndpoint, targetURL
+	return creds, targetURL
 }
 
 func main() {

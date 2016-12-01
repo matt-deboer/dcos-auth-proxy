@@ -2,16 +2,14 @@ package main
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"os"
-
-	"io/ioutil"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -35,10 +33,8 @@ func TestCLISecret(t *testing.T) {
 	args := []string{
 		"dcos-auth-proxy",
 		"-t", targetServer.URL,
-		"-a", authServer.URL,
 		"-p", port,
-		"-s", `{"uid":"random","private_key":"` + strings.Replace(string(toPEM(pk)), "\n", "\\n", -1) + `"}`,
-		// `{"uid":"random","private_key":"` + strings.Replace(string(toPEM(pk)), "\n", "\\n", -1) + `"}\n`,
+		"-s", `{"login_endpoint":"` + authServer.URL + `","uid":"random","private_key":"` + strings.Replace(string(toPEM(pk)), "\n", "\\n", -1) + `"}`,
 		"-k", "-V",
 	}
 

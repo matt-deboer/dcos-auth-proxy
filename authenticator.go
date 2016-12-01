@@ -30,13 +30,12 @@ func checkError(err error) {
 }
 
 type authenticator struct {
-	AuthEndpoint string
-	Target       *url.URL
-	Verbose      bool
-	client       *http.Client
-	creds        *credentials
-	hash         crypto.Hash
-	authZ        string
+	Target  *url.URL
+	Verbose bool
+	client  *http.Client
+	creds   *authContext
+	hash    crypto.Hash
+	authZ   string
 }
 
 func (a *authenticator) authenticate() (string, error) {
@@ -53,10 +52,10 @@ func (a *authenticator) authenticate() (string, error) {
 	}
 
 	if a.Verbose {
-		log.Infof("Authenticating: POST %s  %s", a.AuthEndpoint, bodyLog)
+		log.Infof("Authenticating: POST %s  %s", a.creds.AuthEndpoint, bodyLog)
 	}
 
-	r, _ := http.NewRequest("POST", a.AuthEndpoint, bytes.NewBufferString(body))
+	r, _ := http.NewRequest("POST", a.creds.AuthEndpoint, bytes.NewBufferString(body))
 	r.Header.Add("Content-Type", "application/json")
 	resp, err := a.client.Do(r)
 	checkError(err)
@@ -82,7 +81,7 @@ func (a *authenticator) authenticate() (string, error) {
 	}
 
 	log.Error(fmt.Sprintf("POST %s : %d\n%s",
-		a.AuthEndpoint, resp.StatusCode, resp.Body))
+		a.creds.AuthEndpoint, resp.StatusCode, resp.Body))
 	return "", errors.New("Failed to authenticate")
 
 }
@@ -107,7 +106,7 @@ func base64URLEncode(bytes []byte) string {
 	return strings.TrimRight(base64.URLEncoding.EncodeToString(bytes), "=")
 }
 
-func newAuthenticator(target *url.URL, authEndpoint string, creds *credentials, verbose bool, insecure bool) *authenticator {
+func newAuthenticator(target *url.URL, creds *authContext, verbose bool, insecure bool) *authenticator {
 	var client *http.Client
 	if insecure {
 		tr := &http.Transport{
@@ -117,15 +116,15 @@ func newAuthenticator(target *url.URL, authEndpoint string, creds *credentials, 
 	} else {
 		client = &http.Client{}
 	}
-	return &authenticator{Target: target, AuthEndpoint: authEndpoint, creds: creds, Verbose: verbose, hash: crypto.SHA256, client: client}
+	return &authenticator{Target: target, creds: creds, Verbose: verbose, hash: crypto.SHA256, client: client}
 }
 
 // NewAuthenticationHandler creates a new *goproxy.ProxyHttpServer with an automatic
-// authentication handler using the credentials provided. URLs are re-written
+// authentication handler using the authContext provided. URLs are re-written
 // to point at the provided 'target'.
-func NewAuthenticationHandler(target *url.URL, authEndpoint string, creds *credentials, verbose bool, insecure bool) *goproxy.ProxyHttpServer {
+func NewAuthenticationHandler(target *url.URL, creds *authContext, verbose bool, insecure bool) *goproxy.ProxyHttpServer {
 
-	a := newAuthenticator(target, authEndpoint, creds, verbose, insecure)
+	a := newAuthenticator(target, creds, verbose, insecure)
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)

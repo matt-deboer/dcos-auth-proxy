@@ -8,33 +8,35 @@ import (
 	"errors"
 )
 
-type credentials struct {
-	UID        string
-	PrivateKey *rsa.PrivateKey
-	Password   string
+type authContext struct {
+	UID          string
+	PrivateKey   *rsa.PrivateKey
+	Password     string
+	AuthEndpoint string
 }
 
-func fromPrincipalSecret(secret []byte) (*credentials, error) {
+func fromPrincipalSecret(secret []byte) (*authContext, error) {
 	data := make(map[string]interface{})
 	if err := json.Unmarshal(secret, &data); err != nil {
 		return nil, err
 	}
 	uid := data["uid"].(string)
+	authEndpoint := data["login_endpoint"].(string)
 	if pk, ok := data["private_key"]; ok {
 		privateKey, _ := parsePrivateKey([]byte(pk.(string)))
-		return &credentials{UID: uid, PrivateKey: privateKey}, nil
+		return &authContext{UID: uid, PrivateKey: privateKey, AuthEndpoint: authEndpoint}, nil
 	} else if password, ok := data["password"]; ok {
-		return &credentials{UID: uid, Password: password.(string)}, nil
+		return &authContext{UID: uid, Password: password.(string), AuthEndpoint: authEndpoint}, nil
 	}
 	return nil, nil
 }
 
-func fromPrivateKey(username string, pkBytes []byte) (*credentials, error) {
+func fromPrivateKey(username string, pkBytes []byte, authEndpoint string) (*authContext, error) {
 	pk, err := parsePrivateKey(pkBytes)
 	if err != nil {
 		return nil, err
 	}
-	return &credentials{UID: username, PrivateKey: pk}, nil
+	return &authContext{UID: username, PrivateKey: pk, AuthEndpoint: authEndpoint}, nil
 }
 
 func parsePrivateKey(key []byte) (*rsa.PrivateKey, error) {
