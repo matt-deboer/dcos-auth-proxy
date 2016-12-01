@@ -13,7 +13,8 @@ build: clean
 release: clean
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux go build \
 		-a -tags netgo \
-    -ldflags "-X main.Version=$(VERSION) -X main.Name=$(TARGET)" \
+		-a -installsuffix cgo \
+    -ldflags "-s -X main.Version=$(VERSION) -X main.Name=$(TARGET)" \
 		-o bin/$(TARGET) .
 
 clean:
