@@ -28,7 +28,7 @@ Example
 ---
 
   ```
-  dcos-auth-proxy -t https://my-dcos.example.org/marathon -p 8888 -s $MARATHON_CLIENT_SECRET
+  dcos-auth-proxy -t https://my-dcos.example.org/marathon -p 8888 -s "$MARATHON_CLIENT_SECRET"
   ```
 
 ---
@@ -40,7 +40,7 @@ Example
 ---
 
   ```
-  dcos-auth-proxy authenticate -t https://my-dcos.example.org/marathon -s $MARATHON_CLIENT_SECRET
+  dcos-auth-proxy authenticate -t https://my-dcos.example.org/marathon -s "$MARATHON_CLIENT_SECRET"
   ```
 
 ---
