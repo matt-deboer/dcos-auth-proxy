@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/urfave/cli"
 )
 
 func TestCLISecret(t *testing.T) {
@@ -124,4 +125,48 @@ func TestCLIAuthenticate(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NotEmpty(t, string(bytes))
+}
+
+func TestCLIParseFlags(t *testing.T) {
+
+	pk := genPrivateKey(t)
+	token := genToken()
+
+	authServer := httptest.NewTLSServer(&mockAuthEndpoint{pk: pk, token: token})
+	defer authServer.Close()
+
+	targetServer := httptest.NewTLSServer(&mockTarget{expectedAuthZ: "token=" + token})
+	defer targetServer.Close()
+
+	results := make(chan map[string]interface{}, 1)
+	app := cli.NewApp()
+	app.Commands = []cli.Command{
+		cli.Command{
+			Name:  "authenticate",
+			Flags: commonFlags,
+			Action: func(c *cli.Context) {
+				creds, targetURL := parseFlags(c)
+				results <- map[string]interface{}{
+					"creds":     creds,
+					"targetURL": targetURL,
+				}
+			},
+		},
+	}
+	err := app.Run([]string{
+		"dcos-auth-proxy",
+		"authenticate",
+		"-a", "http://some-other-url",
+		"-s", `{"login_endpoint":"` + authServer.URL + `","uid":"random","private_key":"` + strings.Replace(string(toPEM(pk)), "\n", "\\n", -1) + `"}`,
+		"-k",
+		"-V",
+	})
+	if !assert.NoError(t, err, "Command should parse flags successfully") {
+		t.Fatal(err)
+	}
+
+	result := <-results
+	if result["creds"].(*authContext).AuthEndpoint != "http://some-other-url" {
+		t.Error("Auth endpoint should be overridden")
+	}
 }

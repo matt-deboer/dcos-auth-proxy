@@ -17,6 +17,59 @@ var Name string
 // Version is set at compile time with the git version
 var Version string
 
+var commonFlags = []cli.Flag{
+	cli.StringFlag{
+		Name:  "target, t",
+		Usage: "The target URL to be proxied",
+	},
+	cli.IntFlag{
+		Name:  "port, p",
+		Value: 8888,
+		Usage: "the port on which to listen",
+	},
+	cli.StringFlag{
+		Name:  "auth-endpoint, a",
+		Usage: "The target URL to be proxied",
+	},
+	cli.StringFlag{
+		Name:  "host, H",
+		Value: "localhost",
+		Usage: "the host address on which to listen",
+	},
+	cli.StringFlag{
+		Name:  "username, u",
+		Usage: "proxy authentication user",
+	},
+	cli.StringFlag{
+		Name:  "password, P",
+		Usage: "proxy authentication password",
+	},
+	cli.StringFlag{
+		Name:  "password-file, f",
+		Usage: "proxy authentication password file",
+	},
+	cli.StringFlag{
+		Name:  "private-key-file",
+		Usage: "file containing private-key used to authenticate (requires 'username')",
+	},
+	cli.StringFlag{
+		Name:  "principal-secret, s",
+		Usage: "principal secret containing credentials for obtaining auth tokens",
+	},
+	cli.StringFlag{
+		Name:  "principal-secret-file",
+		Usage: "principal secret file containing credentials for obtaining auth tokens",
+	},
+	cli.BoolFlag{
+		Name:  "verbose, V",
+		Usage: "whether to output all request/response traffic",
+	},
+	cli.BoolFlag{
+		Name:  "insecure, k",
+		Usage: "allow connections to SSL sites without valid certs",
+	},
+}
+
 func run(args []string, stdout *os.File, stderr *os.File) {
 
 	app := cli.NewApp()
@@ -27,60 +80,7 @@ func run(args []string, stdout *os.File, stderr *os.File) {
 		by obtaining and injecting auth tokens as needed.
 		`
 	app.Version = Version
-	commonFlags := []cli.Flag{
-		cli.StringFlag{
-			Name:  "target, t",
-			Usage: "The target URL to be proxied",
-		},
-		cli.IntFlag{
-			Name:  "port, p",
-			Value: 8888,
-			Usage: "the port on which to listen",
-		},
-		cli.StringFlag{
-			Name:  "auth-endpoint, a",
-			Usage: "The target URL to be proxied",
-		},
-		cli.StringFlag{
-			Name:  "host, H",
-			Value: "localhost",
-			Usage: "the host address on which to listen",
-		},
-		cli.StringFlag{
-			Name:  "username, u",
-			Usage: "proxy authentication user",
-		},
-		cli.StringFlag{
-			Name:  "password, P",
-			Usage: "proxy authentication password",
-		},
-		cli.StringFlag{
-			Name:  "password-file, f",
-			Usage: "proxy authentication password file",
-		},
-		cli.StringFlag{
-			Name:  "private-key-file, pk",
-			Usage: "file containing private-key used to authenticate (requires 'username')",
-		},
-		cli.StringFlag{
-			Name:  "principal-secret, s",
-			Usage: "principal secret containing credentials for obtaining auth tokens",
-		},
-		cli.StringFlag{
-			Name:  "principal-secret-file, sf",
-			Usage: "principal secret file containing credentials for obtaining auth tokens",
-		},
-		cli.BoolFlag{
-			Name:  "verbose, V",
-			Usage: "whether to output all request/response traffic",
-		},
-		cli.BoolFlag{
-			Name:  "insecure, k",
-			Usage: "allow connections to SSL sites without valid certs",
-		},
-	}
 	app.Flags = commonFlags
-
 	app.Commands = []cli.Command{
 		cli.Command{
 			Name:  "authenticate",
@@ -210,6 +210,11 @@ func parseFlags(c *cli.Context) (creds *authContext, targetURL *url.URL) {
 
 		creds = &authContext{UID: username, Password: string(bytes), AuthEndpoint: authEndpoint}
 	}
+
+	if creds != nil && len(authEndpoint) > 0 {
+		creds.AuthEndpoint = authEndpoint
+	}
+
 	return creds, targetURL
 }
 

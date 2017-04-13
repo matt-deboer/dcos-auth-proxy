@@ -1,0 +1,42 @@
+{
+    "memo": "3b356f8f31402acfca5616d9e008aa02f1057c4e697a036aa3c55a55f1a38505",
+    "projects": [
+        {
+            "name": "github.com/Sirupsen/logrus",
+            "version": "v0.10.0",
+            "revision": "4b6ea7319e214d98c938f12692336f7ca9348d6b",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/elazarl/goproxy",
+            "revision": "4327d5f85a6da046b9b4818382a3e51f795a249b",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/stretchr/testify",
+            "revision": "1297dc01ed0a819ff634c89707081a4df43baf6b",
+            "packages": [
+                "assert"
+            ]
+        },
+        {
+            "name": "github.com/urfave/cli",
+            "branch": "master",
+            "revision": "0bdeddeeb0f650497d603c4ad7b20cfe685682f6",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "golang.org/x/sys",
+            "revision": "98fc11432b951eb53c62602ba4ae99d03c1fb7e2",
+            "packages": [
+                "unix"
+            ]
+        }
+    ]
+}

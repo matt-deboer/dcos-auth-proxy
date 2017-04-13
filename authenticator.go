@@ -190,6 +190,12 @@ func NewAuthenticationHandler(target *url.URL, creds *authContext, verbose bool,
 					response = r
 				}
 			}
+			if strings.Contains(response.Header.Get("Content-Type"), "text/event-stream") {
+				if a.Verbose {
+					log.Info("Adding eventStreamBody wrapper")
+				}
+				response.Body = newEventStreamBody(response.Body)
+			}
 			return response
 		})
 

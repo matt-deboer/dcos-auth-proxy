@@ -1,0 +1,16 @@
+{
+    "dependencies": {
+        "github.com/Sirupsen/logrus": {
+            "version": ">=0.10.0, <1.0.0"
+        },
+        "github.com/elazarl/goproxy": {
+            "revision": "4327d5f85a6da046b9b4818382a3e51f795a249b"
+        },
+        "github.com/stretchr/testify": {
+            "revision": "1297dc01ed0a819ff634c89707081a4df43baf6b"
+        },
+        "github.com/urfave/cli": {
+            "branch": "master"
+        }
+    }
+}
