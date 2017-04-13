@@ -219,5 +219,5 @@ func parseFlags(c *cli.Context) (creds *authContext, targetURL *url.URL) {
 }
 
 func main() {
-	run(os.Args, os.Stdin, os.Stdout)
+	run(os.Args, os.Stdout, os.Stderr)
 }
