@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/prometheus/common/log"
+	log "github.com/Sirupsen/logrus"
 )
 
 type ossStrategy struct {
