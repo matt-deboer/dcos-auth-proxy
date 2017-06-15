@@ -9,10 +9,13 @@ import (
 )
 
 type authContext struct {
-	UID          string
-	PrivateKey   *rsa.PrivateKey
-	Password     string
-	AuthEndpoint string
+	UID               string
+	PrivateKey        *rsa.PrivateKey
+	Password          string
+	AuthEndpoint      string
+	TokenEndpoint     string
+	OAuthClientID     string
+	OAuthClientSecret string
 }
 
 func fromPrincipalSecret(secret []byte) (*authContext, error) {

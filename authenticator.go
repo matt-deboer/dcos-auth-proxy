@@ -4,13 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -30,76 +25,15 @@ func checkError(err error) {
 }
 
 type authenticator struct {
-	Target  *url.URL
-	Verbose bool
-	client  *http.Client
-	creds   *authContext
-	hash    crypto.Hash
-	authZ   string
+	Target   *url.URL
+	Verbose  bool
+	client   *http.Client
+	authZ    string
+	strategy strategy
 }
 
-func (a *authenticator) authenticate() (string, error) {
-
-	var body string
-	var bodyLog string
-	if a.creds.PrivateKey != nil {
-		token, _ := a.getSelfSignedToken()
-		body = fmt.Sprintf(`{"uid":"%s","token":"%s"}`, a.creds.UID, token)
-		bodyLog = body
-	} else {
-		body = fmt.Sprintf(`{"uid":"%s","password":"%s"}`, a.creds.UID, a.creds.Password)
-		bodyLog = fmt.Sprintf(`{"uid":"%s","password":"%s"}`, a.creds.UID, "****")
-	}
-
-	if a.Verbose {
-		log.Infof("Authenticating: POST %s  %s", a.creds.AuthEndpoint, bodyLog)
-	}
-
-	r, _ := http.NewRequest("POST", a.creds.AuthEndpoint, bytes.NewBufferString(body))
-	r.Header.Add("Content-Type", "application/json")
-	resp, err := a.client.Do(r)
-	checkError(err)
-
-	if a.Verbose {
-		log.Infof("Authentication result: %d", resp.StatusCode)
-	}
-
-	rbody := []byte{}
-	if resp.Body != nil {
-		rbodyString, err := ioutil.ReadAll(resp.Body)
-		checkError(err)
-		rbody = rbodyString
-		defer resp.Body.Close()
-	}
-
-	if resp.StatusCode == 200 {
-		data := make(map[string]interface{})
-		if err := json.Unmarshal(rbody, &data); err != nil {
-			return "", err
-		}
-		return data["token"].(string), nil
-	}
-
-	log.Error(fmt.Sprintf("POST %s : %d\n%s",
-		a.creds.AuthEndpoint, resp.StatusCode, resp.Body))
-	return "", errors.New("Failed to authenticate")
-
-}
-
-func (a *authenticator) getSelfSignedToken() (string, error) {
-
-	head := base64URLEncode([]byte(`{"alg":"RS256","typ":"JWT"}`))
-	body := base64URLEncode([]byte(fmt.Sprintf(`{"uid": "%s"}`, a.creds.UID)))
-	rawToken := head + "." + body
-
-	hashed := sha256.Sum256([]byte(rawToken))
-	sig, err := rsa.SignPKCS1v15(rand.Reader, a.creds.PrivateKey, a.hash, hashed[:])
-	if err != nil {
-		return "", err
-	}
-
-	signature := base64URLEncode(sig)
-	return rawToken + "." + signature, nil
+type strategy interface {
+	authenticate() (string, error)
 }
 
 func base64URLEncode(bytes []byte) string {
@@ -116,7 +50,15 @@ func newAuthenticator(target *url.URL, creds *authContext, verbose bool, insecur
 	} else {
 		client = &http.Client{}
 	}
-	return &authenticator{Target: target, creds: creds, Verbose: verbose, hash: crypto.SHA256, client: client}
+
+	var strategy strategy
+	if len(creds.TokenEndpoint) > 0 {
+		strategy = &auth0Strategy{client: client, creds: creds, Verbose: verbose}
+	} else {
+		strategy = &enterpriseStrategy{client: client, creds: creds, Verbose: verbose, hash: crypto.SHA256}
+	}
+
+	return &authenticator{Target: target, strategy: strategy, Verbose: verbose, client: client}
 }
 
 // NewAuthenticationHandler creates a new *goproxy.ProxyHttpServer with an automatic
@@ -176,7 +118,7 @@ func NewAuthenticationHandler(target *url.URL, creds *authContext, verbose bool,
 			var response *http.Response
 			if r != nil {
 				if r.StatusCode == 401 {
-					authZ, err := a.authenticate()
+					authZ, err := a.strategy.authenticate()
 					if err != nil {
 						log.Errorf("Authentication failure: %v", err)
 						response = r

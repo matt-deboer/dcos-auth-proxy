@@ -60,6 +60,18 @@ var commonFlags = []cli.Flag{
 		Name:  "principal-secret-file",
 		Usage: "principal secret file containing credentials for obtaining auth tokens",
 	},
+	cli.StringFlag{
+		Name:  "oauth-token-endpoint",
+		Usage: "The Oauth token endpoint; specified for using the Auth0 authentication strategy",
+	},
+	cli.StringFlag{
+		Name:  "oauth-client-id",
+		Usage: "The Oauth Client ID; specified for using the Auth0 authentication strategy",
+	},
+	cli.StringFlag{
+		Name:  "oauth-client-secret",
+		Usage: "The Oauth Client secret; specified for using the Auth0 authentication strategy",
+	},
 	cli.BoolFlag{
 		Name:  "verbose, V",
 		Usage: "whether to output all request/response traffic",
@@ -90,7 +102,7 @@ func run(args []string, stdout *os.File, stderr *os.File) {
 				log.SetOutput(stderr)
 				verbose := c.Bool("verbose")
 				creds, _ := parseFlags(c)
-				token, err := newAuthenticator(nil, creds, verbose, c.Bool("insecure")).authenticate()
+				token, err := newAuthenticator(nil, creds, verbose, c.Bool("insecure")).strategy.authenticate()
 				if err != nil {
 					log.Fatalf("Authentication error: %v", err)
 				}
@@ -134,87 +146,125 @@ func parseFlags(c *cli.Context) (creds *authContext, targetURL *url.URL) {
 	privateKeyFile := c.String("private-key-file")
 	secret := c.String("principal-secret")
 	secretFile := c.String("principal-secret-file")
+	oauthTokenEndpoint := c.String("oauth-token-endpoint")
+	oauthClientID := c.String("oauth-client-id")
+	oauthClientSecret := c.String("oauth-client-secret")
 
-	if len(secret) == 0 && len(secretFile) == 0 {
-		if len(username) == 0 {
-			println("ERROR: 'username' is required when 'principal-secret(-file)' not specified\n")
+	if len(oauthTokenEndpoint) > 0 || len(oauthClientID) > 0 || len(oauthClientSecret) > 0 {
+
+		if len(oauthTokenEndpoint) == 0 ||
+			len(oauthClientID) == 0 ||
+			len(oauthClientSecret) == 0 ||
+			len(username) == 0 ||
+			(len(password) == 0 && len(passwordFile) == 0) {
+
+			println("ERROR: when using the OAuth2+OIDC strategy, all of " +
+				"'oauth-token-endpoint', 'oauth-client-id', 'oauth-client-secret', " +
+				"'username', and one of ('password' or 'password-file') must be specified")
 			cli.ShowAppHelp(c)
 			os.Exit(1)
 		}
-		if len(password) == 0 && len(passwordFile) == 0 && len(privateKeyFile) == 0 {
-			println("ERROR: one of 'password' or 'password-file' or 'privateKeyFile' is required when 'principal-secret(-file)' not specified\n")
-			cli.ShowAppHelp(c)
-			os.Exit(1)
+
+		if len(passwordFile) > 0 {
+			pwBytes, err := ioutil.ReadFile(passwordFile)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'passwordFile' %s could not be read: %v\n", passwordFile, err))
+				os.Exit(1)
+			}
+			password = string(pwBytes)
+		}
+
+		creds = &authContext{UID: username, Password: password,
+			TokenEndpoint:     oauthTokenEndpoint,
+			OAuthClientID:     oauthClientID,
+			OAuthClientSecret: oauthClientSecret,
+		}
+		if len(authEndpoint) > 0 {
+			creds.AuthEndpoint = authEndpoint
+		}
+
+	} else {
+
+		if len(secret) == 0 && len(secretFile) == 0 {
+			if len(username) == 0 {
+				println("ERROR: 'username' is required when 'principal-secret(-file)' not specified\n")
+				cli.ShowAppHelp(c)
+				os.Exit(1)
+			}
+			if len(password) == 0 && len(passwordFile) == 0 && len(privateKeyFile) == 0 {
+				println("ERROR: one of 'password' or 'password-file' or 'privateKeyFile' is required when 'principal-secret(-file)' not specified\n")
+				cli.ShowAppHelp(c)
+				os.Exit(1)
+			}
+		}
+
+		if len(target) > 0 {
+			t, err := url.Parse(target)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'target' %s is invalid: %v\n", target, err))
+				cli.ShowAppHelp(c)
+				os.Exit(1)
+			}
+			targetURL = t
+		}
+
+		if len(authEndpoint) == 0 && len(secret) == 0 && len(secretFile) == 0 {
+			if targetURL == nil {
+				println("ERROR: 'auth-endpoint' (or 'target') is required")
+				cli.ShowAppHelp(c)
+				os.Exit(1)
+			}
+			authEndpoint = targetURL.Scheme + "://" + targetURL.Host + "/acs/api/v1/auth/login"
+		}
+
+		var err error
+		if len(secret) > 0 {
+
+			creds, err = fromPrincipalSecret([]byte(secret))
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'secret' %s could not be parsed: %v\n", secret, err))
+				os.Exit(1)
+			}
+
+		} else if len(secretFile) > 0 {
+
+			bytes, err := ioutil.ReadFile(secretFile)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'secretFile' %s could not be read: %v\n", secretFile, err))
+				os.Exit(1)
+			}
+
+			creds, err = fromPrincipalSecret(bytes)
+
+		} else if len(privateKeyFile) > 0 {
+
+			bytes, err := ioutil.ReadFile(privateKeyFile)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'privateKeyFile' %s could not be read: %v\n", privateKeyFile, err))
+				os.Exit(1)
+			}
+
+			creds, err = fromPrivateKey(username, bytes, authEndpoint)
+
+		} else if len(password) > 0 {
+
+			creds = &authContext{UID: username, Password: password, AuthEndpoint: authEndpoint}
+
+		} else if len(passwordFile) > 0 {
+
+			bytes, err := ioutil.ReadFile(passwordFile)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'passwordFile' %s could not be read: %v\n", passwordFile, err))
+				os.Exit(1)
+			}
+
+			creds = &authContext{UID: username, Password: string(bytes), AuthEndpoint: authEndpoint}
+		}
+
+		if creds != nil && len(authEndpoint) > 0 {
+			creds.AuthEndpoint = authEndpoint
 		}
 	}
-
-	if len(target) > 0 {
-		t, err := url.Parse(target)
-		if err != nil {
-			println(fmt.Sprintf("ERROR: 'target' %s is invalid: %v\n", target, err))
-			cli.ShowAppHelp(c)
-			os.Exit(1)
-		}
-		targetURL = t
-	}
-
-	if len(authEndpoint) == 0 && len(secret) == 0 && len(secretFile) == 0 {
-		if targetURL == nil {
-			println("ERROR: 'auth-endpoint' (or 'target') is required")
-			cli.ShowAppHelp(c)
-			os.Exit(1)
-		}
-		authEndpoint = targetURL.Scheme + "://" + targetURL.Host + "/acs/api/v1/auth/login"
-	}
-
-	var err error
-	if len(secret) > 0 {
-
-		creds, err = fromPrincipalSecret([]byte(secret))
-		if err != nil {
-			println(fmt.Sprintf("ERROR: 'secret' %s could not be parsed: %v\n", secret, err))
-			os.Exit(1)
-		}
-
-	} else if len(secretFile) > 0 {
-
-		bytes, err := ioutil.ReadFile(secretFile)
-		if err != nil {
-			println(fmt.Sprintf("ERROR: 'secretFile' %s could not be read: %v\n", secretFile, err))
-			os.Exit(1)
-		}
-
-		creds, err = fromPrincipalSecret(bytes)
-
-	} else if len(privateKeyFile) > 0 {
-
-		bytes, err := ioutil.ReadFile(privateKeyFile)
-		if err != nil {
-			println(fmt.Sprintf("ERROR: 'privateKeyFile' %s could not be read: %v\n", privateKeyFile, err))
-			os.Exit(1)
-		}
-
-		creds, err = fromPrivateKey(username, bytes, authEndpoint)
-
-	} else if len(password) > 0 {
-
-		creds = &authContext{UID: username, Password: password, AuthEndpoint: authEndpoint}
-
-	} else if len(passwordFile) > 0 {
-
-		bytes, err := ioutil.ReadFile(passwordFile)
-		if err != nil {
-			println(fmt.Sprintf("ERROR: 'passwordFile' %s could not be read: %v\n", passwordFile, err))
-			os.Exit(1)
-		}
-
-		creds = &authContext{UID: username, Password: string(bytes), AuthEndpoint: authEndpoint}
-	}
-
-	if creds != nil && len(authEndpoint) > 0 {
-		creds.AuthEndpoint = authEndpoint
-	}
-
 	return creds, targetURL
 }
 
