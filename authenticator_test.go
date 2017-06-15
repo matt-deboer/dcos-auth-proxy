@@ -50,7 +50,7 @@ func TestAuthenticate(t *testing.T) {
 	creds, _ := fromPrivateKey("random", toPEM(pk), authServer.URL)
 	a := newAuthenticator(targetEndpoint, creds, true, true)
 
-	token, err := a.authenticate()
+	token, err := a.strategy.authenticate()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, token)
 }
