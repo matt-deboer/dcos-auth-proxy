@@ -13,7 +13,7 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-type auth0Strategy struct {
+type ossStrategy struct {
 	Target  *url.URL
 	Verbose bool
 	client  *http.Client
@@ -21,9 +21,9 @@ type auth0Strategy struct {
 	hash    crypto.Hash
 }
 
-func (a *auth0Strategy) authenticate() (string, error) {
+func (o *ossStrategy) authenticate() (string, error) {
 
-	idToken, err := a.getIDToken()
+	idToken, err := o.getIDToken()
 	if err != nil {
 		return "", err
 	}
@@ -31,16 +31,16 @@ func (a *auth0Strategy) authenticate() (string, error) {
 	body := fmt.Sprintf(`{"token":"%s"}`, idToken)
 	bodyLog := fmt.Sprintf(`{"token":"*****"}`)
 
-	if a.Verbose {
-		log.Infof("Authenticating: POST %s  %s", a.creds.AuthEndpoint, bodyLog)
+	if o.Verbose {
+		log.Infof("Authenticating: POST %s  %s", o.creds.AuthEndpoint, bodyLog)
 	}
 
-	r, _ := http.NewRequest("POST", a.creds.AuthEndpoint, bytes.NewBufferString(body))
+	r, _ := http.NewRequest("POST", o.creds.AuthEndpoint, bytes.NewBufferString(body))
 	r.Header.Add("Content-Type", "application/json")
-	resp, err := a.client.Do(r)
+	resp, err := o.client.Do(r)
 	checkError(err)
 
-	if a.Verbose {
+	if o.Verbose {
 		log.Infof("Authentication result: %d", resp.StatusCode)
 	}
 
@@ -65,33 +65,33 @@ func (a *auth0Strategy) authenticate() (string, error) {
 
 	if len(token) == 0 {
 		log.Error(fmt.Sprintf("POST %s : %d\n%s",
-			a.creds.AuthEndpoint, resp.StatusCode, resp.Body))
+			o.creds.AuthEndpoint, resp.StatusCode, resp.Body))
 		return "", errors.New("Failed to obtain DC/OS AuthN token")
 	}
 
 	return token, nil
 }
 
-func (a *auth0Strategy) getIDToken() (string, error) {
+func (o *ossStrategy) getIDToken() (string, error) {
 
 	body := fmt.Sprintf(`{"grant_type":"password","scope":"openid email",
 		"client_id":"%s","client_secret":"%s","username":"%s","password":"%s"}`,
-		a.creds.OAuthClientID, a.creds.OAuthClientSecret, a.creds.UID, a.creds.Password)
+		o.creds.OAuthClientID, o.creds.OAuthClientSecret, o.creds.UID, o.creds.Password)
 
 	bodyLog := fmt.Sprintf(`{"grant_type":"password","scope":"openid email",
 		"client_id":"%s","client_secret":"%s","username":"%s","password":"*****"}`,
-		a.creds.OAuthClientID, a.creds.OAuthClientSecret, a.creds.UID)
+		o.creds.OAuthClientID, o.creds.OAuthClientSecret, o.creds.UID)
 
-	if a.Verbose {
-		log.Infof("Authenticating: POST %s  %s", a.creds.TokenEndpoint, bodyLog)
+	if o.Verbose {
+		log.Infof("Authenticating: POST %s  %s", o.creds.TokenEndpoint, bodyLog)
 	}
 
-	r, _ := http.NewRequest("POST", a.creds.TokenEndpoint, bytes.NewBufferString(body))
+	r, _ := http.NewRequest("POST", o.creds.TokenEndpoint, bytes.NewBufferString(body))
 	r.Header.Add("Content-Type", "application/json")
-	resp, err := a.client.Do(r)
+	resp, err := o.client.Do(r)
 	checkError(err)
 
-	if a.Verbose {
+	if o.Verbose {
 		log.Infof("Authentication result: %d", resp.StatusCode)
 	}
 
@@ -116,7 +116,7 @@ func (a *auth0Strategy) getIDToken() (string, error) {
 
 	if len(idToken) == 0 {
 		log.Error(fmt.Sprintf("POST %s : %d\n%s",
-			a.creds.TokenEndpoint, resp.StatusCode, resp.Body))
+			o.creds.TokenEndpoint, resp.StatusCode, resp.Body))
 		return "", errors.New("Failed to obtain OIDC id_token")
 	}
 

@@ -53,7 +53,7 @@ func newAuthenticator(target *url.URL, creds *authContext, verbose bool, insecur
 
 	var strategy strategy
 	if len(creds.TokenEndpoint) > 0 {
-		strategy = &auth0Strategy{client: client, creds: creds, Verbose: verbose}
+		strategy = &ossStrategy{client: client, creds: creds, Verbose: verbose}
 	} else {
 		strategy = &enterpriseStrategy{client: client, creds: creds, Verbose: verbose, hash: crypto.SHA256}
 	}
