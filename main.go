@@ -183,6 +183,16 @@ func parseFlags(c *cli.Context) (creds *authContext, targetURL *url.URL) {
 			creds.AuthEndpoint = authEndpoint
 		}
 
+		if len(target) > 0 {
+			t, err := url.Parse(target)
+			if err != nil {
+				println(fmt.Sprintf("ERROR: 'target' %s is invalid: %v\n", target, err))
+				cli.ShowAppHelp(c)
+				os.Exit(1)
+			}
+			targetURL = t
+		}
+
 	} else {
 
 		if len(secret) == 0 && len(secretFile) == 0 {
